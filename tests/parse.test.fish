@@ -9,5 +9,5 @@ set -l rows (_claude_sessions --all)
 set -l p (string split \t -- $rows[1])
 
 @test "uses the summary as the title" "$p[2]" = "Envoy LB timeout fix"
-@test "captures the session cwd" "$p[3]" = "/tmp/proj"
+@test "captures the session cwd" "$p[3]" = /tmp/proj
 @test "indexes the transcript body" (string match -q '*envoy timeout*' (string lower -- "$p[5]"); and echo yes) = yes
