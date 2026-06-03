@@ -1,0 +1,23 @@
+# Applied by the GitHub "Settings" app (https://github.com/apps/settings) when it
+# has access to this repo. Inert (just a documented intent) otherwise.
+repository:
+  description: Fish session picker and completions for Claude Code (ccr / ccri)
+  homepage: https://github.com/pasqualesalza/claude.fish
+  topics: fish, fish-shell, fish-plugin, fisher, fzf, claude, claude-code, cli
+  private: true
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  enable_automated_security_fixes: true
+  enable_vulnerability_alerts: true
+
+labels:
+  - { name: bug, color: "d73a4a", description: Something is not working. }
+  - { name: enhancement, color: "0075ca", description: New feature or improvement. }
+  - { name: documentation, color: "0075ca", description: Documentation improvements. }
+  - { name: chore, color: "84d396", description: Build, deps, or CI maintenance. }

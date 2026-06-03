@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) : ;;
+            *) echo "::error::Tag '$TAG' must look like vMAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+          gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
