@@ -6,6 +6,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-03
+
 ### Added
 
 - `ccr` / `ccri` — zoxide-style session picker to find and resume Claude Code sessions
