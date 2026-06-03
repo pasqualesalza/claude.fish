@@ -1,0 +1,14 @@
+# Activate once with: lefthook install
+# Keeps the same checks the CI lint job runs, but before the commit lands.
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.fish"
+      run: fish_indent --check {staged_files}
+    syntax:
+      glob: "*.fish"
+      run: for f in {staged_files}; do fish -n "$f" || exit 1; done
+    test:
+      glob: "*.fish"
+      run: fish -c 'fishtape tests/*.test.fish'

@@ -17,15 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Create GitHub Release
+      - name: Validate tag format
         env:
-          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           case "$TAG" in
             v[0-9]*.[0-9]*.[0-9]*) : ;;
             *) echo "::error::Tag '$TAG' must look like vMAJOR.MINOR.PATCH"; exit 1 ;;
           esac
-          gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        uses: ffurrer2/extract-release-notes@v3
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          body: ${{ steps.notes.outputs.release_notes }}
