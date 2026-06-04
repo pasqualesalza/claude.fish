@@ -31,9 +31,9 @@ function ccri --description "Interactively pick and resume a Claude Code session
         set -l path $p[4]
         set -l body $p[5]
 
-        set -l disp $title
+        set -l disp "$title $dim"(string sub -l 8 -- $id)"$rst"
         if set -q _flag_all; and test -n "$cwd"
-            set disp "$title $dim· "(string replace -- "$HOME" '~' "$cwd")"$rst"
+            set disp "$disp $dim· "(string replace -- "$HOME" '~' "$cwd")"$rst"
         end
         test -n "$body"; and set disp "$disp $dim│ $body$rst"
 
