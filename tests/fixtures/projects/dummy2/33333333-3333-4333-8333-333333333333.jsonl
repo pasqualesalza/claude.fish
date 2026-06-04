@@ -1,0 +1,4 @@
+{"type":"user","isSidechain":true,"message":{"role":"user","content":"subagent helper turn"},"cwd":"/tmp/proj2"}
+{"type":"user","message":{"role":"user","content":"main question here"},"cwd":"/tmp/proj2"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"main answer"}]}}
+{"type":"ai-title","aiTitle":"mixed session"}
