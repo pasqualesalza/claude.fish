@@ -21,10 +21,10 @@ jobs:
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          case "$TAG" in
-            v[0-9]*.[0-9]*.[0-9]*) : ;;
-            *) echo "::error::Tag '$TAG' must look like vMAJOR.MINOR.PATCH"; exit 1 ;;
-          esac
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Tag '$TAG' must match vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
       - name: Extract release notes from CHANGELOG.md
         id: notes
         uses: ffurrer2/extract-release-notes@v3
