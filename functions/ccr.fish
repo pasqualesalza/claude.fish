@@ -23,6 +23,7 @@ function ccr --description "Resume a Claude Code session — no args: latest her
     if test -z "$query"
         set chosen $rows[1]
     else
+        # AND-match: pick the most-recent row whose title+body contains every term.
         set -l terms (string split -n ' ' -- (string lower -- "$query"))
         for r in $rows
             set -l p (string split \t -- $r)

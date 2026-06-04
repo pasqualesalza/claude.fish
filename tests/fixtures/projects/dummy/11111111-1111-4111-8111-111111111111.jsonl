@@ -1,3 +1,4 @@
 {"type":"user","message":{"role":"user","content":"Fix the envoy timeout"},"cwd":"/tmp/proj","gitBranch":"main"}
 {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Sure, let me look at the config"}]}}
-{"type":"summary","summary":"Envoy LB timeout fix"}
+{"type":"ai-title","aiTitle":"Envoy LB timeout fix"}
+{"type":"custom-title","customTitle":"envoy work"}
