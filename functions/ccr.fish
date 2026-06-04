@@ -4,6 +4,10 @@ function ccr --description "Resume a Claude Code session — no args: latest her
         echo "ccr [--all] [query]   resume the latest (or best-matching) Claude session"
         return 0
     end
+    type -q jq; or begin
+        echo "ccr: jq is required (e.g. brew install jq)" >&2
+        return 1
+    end
     set -l query (string join ' ' -- $argv)
 
     set -l rows
@@ -30,7 +34,7 @@ function ccr --description "Resume a Claude Code session — no args: latest her
             set -l hay (string lower -- "$p[2] $p[5]")
             set -l miss 0
             for t in $terms
-                string match -q -- "*$t*" "$hay"; or begin
+                string contains -q -- "$t" "$hay"; or begin
                     set miss 1
                     break
                 end

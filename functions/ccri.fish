@@ -4,6 +4,10 @@ function ccri --description "Interactively pick and resume a Claude Code session
         echo "ccri [--all] [query]   fuzzy-pick a Claude session and resume it"
         return 0
     end
+    type -q jq; or begin
+        echo "ccri: jq is required (e.g. brew install jq)" >&2
+        return 1
+    end
     set -l query (string join ' ' -- $argv)
 
     set -l rows

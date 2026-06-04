@@ -27,7 +27,12 @@ function _claude_session_preview --description "Render a Claude Code session tra
       | ( [ .[] | select(.type=="ai-title") | .aiTitle ] | last ) as $ai
       | ( [ .[] | select(.type=="agent-name") | .agentName ] | last ) as $agent
       | ( [ .[] | select(.type=="last-prompt") | .lastPrompt ] | last ) as $last
-      | ( if ($custom // "") != "" then "✎ " + $custom else ($ai // $agent // "(untitled)") end ) as $title
+      | ( [ .[] | select(.type=="user" and ((.isMeta // false) | not)) | msgtext(.message) | select(. != null and . != "") ] | first ) as $firstuser
+      | ( if ($custom // "") != "" then "✎ " + $custom
+          elif ($ai // "") != "" then $ai
+          elif ($agent // "") != "" then $agent
+          elif ($firstuser // "") != "" then $firstuser
+          else "(untitled)" end ) as $title
       | ( "[1m" + $title + "[0m"
           + (if ($last // "") != "" then "\n[2m↩ last: " + ($last | .[0:500] | gsub("[ \t\n\r]+"; " ") | .[0:240]) + "[0m" else "" end)
           + "\n[2m" + ("─" * 60) + "[0m" ),
