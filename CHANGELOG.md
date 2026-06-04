@@ -6,6 +6,23 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-04
+
+### Added
+
+- Short session id in the `ccri` list (helps tell apart same-titled / forked sessions).
+
+### Fixed
+
+- Robustness pass from an independent code review: NUL-delimited paths (handles spaces in
+  paths), the latest title record wins, no parallel-pipe interleaving, stray control/ESC bytes
+  are stripped, sessions that mix sidechain and normal turns are kept, and `CLAUDE_FISH_LIMIT`
+  is validated.
+- `ccr <query>` now matches literally (no glob surprises); `ccr`/`ccri` report a clear error
+  if `jq` is missing.
+- Preview falls back to the first user message when a session has no title.
+- Release tag validation anchored to `vMAJOR.MINOR.PATCH`.
+
 ## [0.2.0] - 2026-06-04
 
 ### Added
