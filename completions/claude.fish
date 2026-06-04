@@ -13,7 +13,7 @@ complete -c claude -f
 
 # Flags
 complete -c claude -s c -l continue -d 'Continue the most recent conversation'
-complete -c claude -l resume -r -d 'Resume a session by id' -a '(_claude_complete_resume)'
+complete -c claude -l resume -x -d 'Resume a session by id' -a '(_claude_complete_resume)'
 complete -c claude -s p -l print -d 'Print response and exit (non-interactive)'
 complete -c claude -l model -x -d 'Model to use' -a 'opus sonnet haiku'
 complete -c claude -l permission-mode -x -d 'Permission mode' -a 'default acceptEdits plan bypassPermissions'
