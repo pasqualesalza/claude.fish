@@ -6,7 +6,9 @@ a zoxide-style session picker plus completions for the `claude` CLI (which ships
 ## Commands
 
 - `ccr [--all] [query]` — resume the **latest** (or best-matching) session in the current
-  project. No query → most recent here. No match → falls back to the picker.
+  project. No query → the session this terminal last resumed (remembered in the shell-global
+  `_claude_fish_last_session`), else the most recent here. No match → falls back to the
+  picker. In-session `/resume` is Claude's own, in-process, and invisible to the shell.
 - `ccri [--all] [query]` — **interactive** fzf picker with a transcript preview.
 
 Both run `claude --resume <id>` in the session's own working directory. `--all` searches every

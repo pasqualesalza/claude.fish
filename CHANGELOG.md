@@ -6,6 +6,20 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-06
+
+### Fixed
+
+- `ccr <query>` now actually matches: it used `string contains`, which is **not** a fish
+  subcommand, so every query errored and fell back to the picker (broken on all fish since
+  the literal-match change). Replaced with a regex-escaped `string match`, keeping the
+  literal (non-glob) semantics. Now covered by a test.
+- `ccr` (no query) now re-opens the session **this** terminal last resumed instead of
+  whichever session in the project was most recently modified. Two windows resuming
+  sessions in the same folder no longer steal each other's session on exit. If that session
+  is gone it falls back to the newest, and an explicit `ccr <query>` still wins. Both `ccr`
+  and the `ccri` picker record the resumed session so a later bare `ccr` follows it.
+
 ## [0.2.1] - 2026-06-04
 
 ### Added

@@ -71,5 +71,7 @@ function ccri --description "Interactively pick and resume a Claude Code session
     if test -n "$scwd"; and test "$scwd" != "$PWD"
         cd "$scwd"; or return 1
     end
+    # Record the resumed session so a later no-arg `ccr` in this shell follows it.
+    set -g _claude_fish_last_session $id
     claude --resume $id
 end

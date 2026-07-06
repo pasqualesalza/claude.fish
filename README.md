@@ -14,13 +14,18 @@ them — so resuming always reattaches to the right conversation instead of spaw
 
 | Command | Behaviour |
 |---|---|
-| `ccr` | Resume the **most recent** session in this folder — "continue where I left off". |
+| `ccr` | Resume the session **this terminal** last opened here, else the most recent one — "continue where I left off". |
 | `ccr <query>` | Resume the most recent session matching `<query>` (title + transcript). Falls back to the picker if nothing matches. |
 | `ccri [query]` | **Interactive** `fzf` picker with a transcript preview. |
 | `… --all` | Search across every project, not just this folder. |
 
 Both run `claude --resume <id>` in the session's own working directory. Tab-completing
 `claude --resume ` also lists your sessions by title.
+
+`ccr` (no query) remembers, **per terminal**, the last session it resumed, so two windows
+working in the same folder don't steal each other's session when you exit one. Switching
+sessions *inside* Claude Code (its own `/resume`) happens within the `claude` process and is
+invisible to the shell, so it doesn't change what a later `ccr` reopens.
 
 ## What the picker shows
 
