@@ -1,9 +1,8 @@
-function _claude_sessions --description "Emit Claude Code sessions as TSV: id<TAB>title<TAB>cwd<TAB>path<TAB>body, most-recent first"
+function _claude_sessions --description "Emit Claude Code sessions as TSV: id<TAB>title<TAB>cwd<TAB>path<TAB>mtime<TAB>body, most-recent first"
     argparse a/all -- $argv 2>/dev/null; or return 1
 
     # Project root is overridable so tests can point it at fixtures.
-    set -l root "$HOME/.claude/projects"
-    set -q CLAUDE_FISH_PROJECTS_ROOT; and set root $CLAUDE_FISH_PROJECTS_ROOT
+    set -l root (_claude_projects_root)
     test -d "$root"; or return 0
     type -q jq; or return 0
 
@@ -93,6 +92,10 @@ function _claude_sessions --description "Emit Claude Code sessions as TSV: id<TA
         b=$(printf "%s" "$meta" | cut -f3-)
         printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$mtime" "$id" "$t" "$c" "$f" "$b" > "$CCF_TMPD/$id"
     ' _
-    find "$CCF_TMPD" -type f -exec cat {} + 2>/dev/null | sort -t \t -k1,1 -rn | cut -f2-
+    # Sort by the leading mtime, then move it after `path` so the body stays the
+    # last field. `oneline` has already stripped tabs from the body, so the fixed
+    # field count holds.
+    find "$CCF_TMPD" -type f -exec cat {} + 2>/dev/null | sort -t \t -k1,1 -rn \
+        | awk -F '\t' -v OFS='\t' '{ print $2, $3, $4, $5, $1, $6 }'
     rm -rf "$CCF_TMPD"
 end
