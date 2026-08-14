@@ -1,12 +1,17 @@
 function ccr --description "Resume a Claude Code session — no args: latest here; <query>: best recency match"
-    argparse a/all h/help -- $argv; or return 1
+    argparse a/all h/help empty-trash -- $argv; or return 1
     if set -q _flag_help
         echo "ccr [--all] [query]   resume the latest (or best-matching) Claude session"
+        echo "ccr --empty-trash     permanently delete everything in claude.fish's trash"
         return 0
     end
     type -q jq; or begin
         echo "ccr: jq is required (e.g. brew install jq)" >&2
         return 1
+    end
+    if set -q _flag_empty_trash
+        _claude_empty_trash
+        return $status
     end
     set -l query (string join ' ' -- $argv)
 
@@ -22,7 +27,7 @@ function ccr --description "Resume a Claude Code session — no args: latest her
         return 1
     end
 
-    # rows come back most-recent-first as: id<TAB>title<TAB>cwd<TAB>path<TAB>body
+    # rows come back most-recent-first as: id<TAB>title<TAB>cwd<TAB>path<TAB>mtime<TAB>body
     set -l chosen
     if test -z "$query"
         # No query: prefer the session THIS shell last resumed, so a terminal keeps
@@ -43,7 +48,7 @@ function ccr --description "Resume a Claude Code session — no args: latest her
         set -l terms (string split -n ' ' -- (string lower -- "$query"))
         for r in $rows
             set -l p (string split \t -- $r)
-            set -l hay (string lower -- "$p[2] $p[5]")
+            set -l hay (string lower -- "$p[2] $p[6]")
             set -l miss 0
             for t in $terms
                 # Literal substring test: fish has no `string contains`, so match a
@@ -74,6 +79,17 @@ function ccr --description "Resume a Claude Code session — no args: latest her
     set -l cp (string split \t -- $chosen)
     set -l id $cp[1]
     set -l scwd $cp[3]
+
+    # Two Claude processes appending to one transcript interleave their records, so
+    # warn before handing the same session to a second terminal.
+    for l in (_claude_live_sessions)
+        set -l lp (string split \t -- $l)
+        if test "$lp[1]" = "$id"
+            echo "ccr: warning — $id is already open elsewhere ($lp[2])" >&2
+            break
+        end
+    end
+
     if test -n "$scwd"; and test "$scwd" != "$PWD"
         cd "$scwd"; or return 1
     end
