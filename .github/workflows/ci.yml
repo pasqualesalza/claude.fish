@@ -18,11 +18,36 @@ jobs:
       - uses: fish-actions/syntax-check@v1
       - uses: fish-actions/format-check@v1
 
+  # Both renderers ship, so both are tested: this job has no mdcat and exercises the
+  # no-dependency fallback, `test-mdcat` below installs it and exercises the markdown path.
+  # Assertions about mdcat's output sit behind `if type -q mdcat`, so this job skips them rather
+  # than failing — that split is what keeps the fallback honestly covered.
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: fish-actions/install-fish@v1
+      - name: Install fishtape and run tests
+        shell: fish {0}
+        run: |
+          curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source
+          fisher install jorgebucaran/fishtape
+          fishtape tests/*.test.fish
+
+  test-mdcat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: fish-actions/install-fish@v1
+      # A pinned release binary rather than `cargo install`: the same 2.15.0 the plugin is
+      # developed against, and seconds instead of minutes.
+      - name: Install mdcat
+        run: |
+          curl -sSfL -o mdcat.tar.gz \
+            https://github.com/BIRSAx2/mdcat/releases/download/mdcat-2.15.0/mdcat-2.15.0-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf mdcat.tar.gz
+          sudo install -m 0755 mdcat-2.15.0-x86_64-unknown-linux-gnu/mdcat /usr/local/bin/mdcat
+          mdcat --version
       - name: Install fishtape and run tests
         shell: fish {0}
         run: |

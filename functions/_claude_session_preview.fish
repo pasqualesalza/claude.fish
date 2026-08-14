@@ -4,15 +4,11 @@ function _claude_session_preview --description "Render a Claude Code session tra
     argparse f/full -- $argv 2>/dev/null; or return 1
     set -l path $argv[1]
     set -l query $argv[2]
-    # `full` reads much further back and stops clipping messages. It is what ctrl-o uses,
-    # and `set -U claude_fish_preview full` makes it the pane's normal behaviour too — at a
-    # real cost, since the pane re-renders on every cursor move: measured 236ms → 1015ms on a
-    # 3.9MB session that renders 6500 lines. Cheap sessions barely notice (+2ms).
+    # `full` reads much further back and stops clipping messages: it is what ctrl-o uses. There
+    # is deliberately no setting to make the browse pane behave this way — it re-renders on every
+    # cursor move, and that measured 236ms → 1015ms on a 3.9MB session.
     set -l full 0
     set -q _flag_full; and set full 1
-    if set -q claude_fish_preview; and test "$claude_fish_preview" = full
-        set full 1
-    end
 
     set -l lines 400
     set -l cap 1200
@@ -42,6 +38,15 @@ function _claude_session_preview --description "Render a Claude Code session tra
     #   --local              never fetch remote resources — the pane must not hit the
     #                        network just because a transcript mentions an image URL
     #   --image-protocol none  don't try to draw images into the pane
+    # Exactly three lines, pinned by fzf with `--preview-window ~3` so they stay put while the
+    # transcript scrolls under them. Both renderers share it, which is also what stopped the
+    # header being built twice in two different jq programs.
+    set -l headw 80
+    if set -q FZF_PREVIEW_COLUMNS; and test -n "$FZF_PREVIEW_COLUMNS"
+        set headw $FZF_PREVIEW_COLUMNS
+    end
+    _claude_session_head "$path" $headw
+
     if not set -q claude_fish_renderer; or test "$claude_fish_renderer" != ansi
         if type -q mdcat
             set -l cols 80
@@ -59,11 +64,13 @@ function _claude_session_preview --description "Render a Claude Code session tra
             # Framing is the DEFAULT: it is the only mode where user and assistant are
             # visually distinct, because mdcat gives every heading the same colour and only
             # the awk pass knows which role it is looking at.
-            set -l framing 0
-            set -l mdcols $cols
-            if not set -q claude_fish_turns; or test "$claude_fish_turns" = frame
-                set framing 1
-                set mdcols (math $cols - 2)
+            # Framing unless explicitly turned off with `heading`: anything unrecognised falls
+            # back to the default, the way the other settings behave.
+            set -l framing 1
+            set -l mdcols (math $cols - 2)
+            if set -q claude_fish_turns; and test "$claude_fish_turns" = heading
+                set framing 0
+                set mdcols $cols
             end
 
             # One of mdcat's ten built-in themes (dark, nord, dracula, gruvbox-*,
@@ -76,16 +83,10 @@ function _claude_session_preview --description "Render a Claude Code session tra
 
             set -l out
             if test $framing -eq 1
-                # Two SGR parameter strings, user then assistant. Digits and semicolons only:
-                # these are interpolated into an escape sequence, so nothing else belongs.
+                # Green for user, cyan for assistant — basic ANSI, so they resolve against the
+                # terminal's own palette like everything else the picker draws.
                 set -l ucol '1;32'
                 set -l acol '1;36'
-                if set -q claude_fish_role_colors[2]
-                    and string match -qr '^[0-9;]+$' -- "$claude_fish_role_colors[1]"
-                    and string match -qr '^[0-9;]+$' -- "$claude_fish_role_colors[2]"
-                    set ucol $claude_fish_role_colors[1]
-                    set acol $claude_fish_role_colors[2]
-                end
                 set out ($md "$path" | mdcat $mdopts - 2>/dev/null \
                     | awk -v w=$cols -v ucol=$ucol -v acol=$acol "$(_claude_frame_awk)" \
                     | string collect)
@@ -93,8 +94,11 @@ function _claude_session_preview --description "Render a Claude Code session tra
                 set out ($md "$path" | mdcat $mdopts - 2>/dev/null | string collect)
             end
             if test -n "$out"
+                # The whole rendering goes out, top to bottom: landing the pane on the end is
+                # the `follow` flag's job in ccri, which leaves the history above to scroll into.
                 if test -n "$query"
-                    set -l pat (string join '|' (string escape --style=regex (string split -n ' ' -- $query)))
+                    set -l terms (string escape --style=regex (string split -n ' ' -- $query))
+                    set -l pat (string join '|' $terms)
                     printf '%s\n' $out | grep -iE --color=always -- "$pat|\$"
                 else
                     printf '%s\n' $out
@@ -107,19 +111,6 @@ function _claude_session_preview --description "Render a Claude Code session tra
     # Cheap metadata that is NOT in the transcript body: size, age, liveness. One
     # stat and a handful of small registry files — the transcript itself is never
     # read twice for this.
-    set -l id (string replace -r '\.jsonl$' '' -- (path basename "$path"))
-    set -l mtime (stat -f '%m' "$path" 2>/dev/null)
-    test -n "$mtime"; or set mtime (stat -c '%Y' "$path" 2>/dev/null)
-    set -l size (du -h "$path" 2>/dev/null | cut -f1 | string trim)
-    set -l facts
-    test -n "$size"; and set -a facts "$size"
-    test -n "$mtime"; and set -a facts (string trim -- (_claude_reltime $mtime))
-    for l in (_claude_live_sessions)
-        set -l lp (string split \t -- $l)
-        test "$lp[1]" = "$id"; and set -a facts "open now ($lp[2])"
-    end
-    set -a facts (string sub -l 8 -- $id)
-
     # Recap header (title, where it lives, where you left off) then the most recent
     # messages, so you decide whether to resume at a glance.
     #
@@ -135,7 +126,7 @@ function _claude_session_preview --description "Render a Claude Code session tra
     # tool_use / tool_result blocks carry neither .text nor .thinking, so they drop out
     # here: that is the single biggest noise reduction available, and the same choice cchb
     # and ccresume make. Thinking blocks are held back too, except in read mode.
-    set -l prog '
+    set -l prog (_claude_clip_jq | string collect)'
       def nz: . != null and . != "";
       def style:
           # [*][*] rather than \*\*: a backslash must survive BOTH fish single quotes and
@@ -174,6 +165,20 @@ function _claude_session_preview --description "Render a Claude Code session tra
               then ($parts[$i] | codeblock)
               else ($parts[$i] | style) end ]
         | join("");
+      # Same clipping rule as the mdcat path: the pane is anchored on the END of the
+      # conversation, so the LAST turn keeps its tail and the earlier ones their head. The last
+      # turn was over budget on all six sessions measured, so head-clipping it hid exactly the
+      # words the pane is opened to read. The dim … says which end went missing.
+      def clip($tail):
+          if (length <= $cap) then render
+          else . as $t
+            | ($t | split("\n") | length) as $was
+            | clipped($tail; $cap) as $k
+            | ($was - ($k | split("\n") | length)) as $gone
+            | (if $gone > 1 then "\u001b[2m… " + ($gone|tostring) + " more lines\u001b[0m"
+               else "\u001b[2m… more\u001b[0m" end) as $mark
+            | if $tail then $mark + "\n" + ($k | render) else ($k | render) + "\n" + $mark end
+          end;
       # A coloured left rule down every line of a turn, the way cchb blocks off speakers.
       def gutter($c): "\u001b[" + $c + "m│\u001b[0m " + gsub("\n"; "\n\u001b[" + $c + "m│\u001b[0m ");
       def msgtext(m):
@@ -183,43 +188,40 @@ function _claude_session_preview --description "Render a Claude Code session tra
               ([ $c[0:80][] | if type=="object" then (.text // (if $think == 1 then .thinking else null end) // "")
                               elif type=="string" then . else "" end ] | join("\n"))
             else "" end );
+      # Claude Code injects machinery — task notifications, system reminders, command output — as
+      # ordinary `user` turns, and does NOT flag them isMeta. The mdcat path has always dropped
+      # them; this one did not, so pinning the fallback (or simply not having mdcat, as CI does
+      # not) put walls of <task-notification> in the pane. Same regex, so the two agree.
+      def injected: test($injected_re);
       [ .[] | select(type=="object") ] as $recs
-      | ( [ $recs[] | select(.type=="custom-title") | .customTitle ] | last ) as $custom
-      | ( [ $recs[] | select(.type=="ai-title") | .aiTitle ] | last ) as $ai
-      | ( [ $recs[] | select(.type=="agent-name") | .agentName ] | last ) as $agent
-      | ( [ $recs[] | select(.type=="last-prompt") | .lastPrompt ] | last ) as $last
-      | ( [ $recs[] | select(.type=="user" and ((.isMeta // false) | not)) | msgtext(.message) | select(nz) ] | first ) as $firstuser
-      | ( [ $recs[] | .cwd // empty ] | last ) as $cwd
-      | ( [ $recs[] | .gitBranch // empty | select(nz) ] | last ) as $branch
-      | ( [ $recs[] | select(.type=="assistant") | .message.model // empty | select(nz) ] | last ) as $model
-      | ( if ($custom | nz) then "✎ " + $custom
-          elif ($ai | nz) then $ai
-          elif ($agent | nz) then $agent
-          elif ($firstuser | nz) then $firstuser
-          else "(untitled)" end ) as $title
-      | ( [ (($cwd // "") | sub("^" + $home; "~")), $branch, $model ] | map(select(nz)) | join(" · ") ) as $where
-      | ( "\u001b[1m" + $title + "\u001b[0m"
-          + (if ($where | nz) then "\n\u001b[2m" + $where + "\u001b[0m" else "" end)
-          + "\n\u001b[2m" + $facts + "\u001b[0m"
-          + (if ($last | nz) then "\n\u001b[2m↩ last: " + ($last | .[0:500] | gsub("[ \t\n\r]+"; " ") | .[0:240]) + "\u001b[0m" else "" end)
-          + "\n\u001b[2m" + ("─" * 60) + "\u001b[0m" ),
-        ( $recs[]
+      | [ $recs[]
           | select(.type=="user" or .type=="assistant")
-          | (.type == "user") as $isuser
-          | msgtext(.message) as $t
-          | select($t | nz)
-          | (if $isuser then "32" else "36" end) as $c
-          | "\n" + "\u001b[1;" + $c + "m▸ " + (if $isuser then "user" else "assistant" end) + "\u001b[0m"
-            + "\n" + (($t | .[0:$cap] | render) + (if ($t | length) > $cap then "\u001b[2m …\u001b[0m" else "" end) | gutter($c)) )'
+          | { isuser: (.type == "user"), t: msgtext(.message) }
+          | select(.t | nz)
+          | select(.t | injected | not) ] as $turns
+      | ($turns | length) as $n
+      | ( if $more == 1
+          then "\u001b[2m… earlier turns are outside the preview window — ctrl-o reads further back\u001b[0m"
+          else empty end ),
+        ( range(0; $n)
+          | . as $i
+          | (if $turns[$i].isuser then "32" else "36" end) as $c
+          | "\n" + "\u001b[1;" + $c + "m▸ " + (if $turns[$i].isuser then "user" else "assistant" end) + "\u001b[0m"
+            + "\n" + ($turns[$i].t | clip($i == $n - 1) | gutter($c)) )'
 
-    set -l jqargs --arg facts (string join ' · ' $facts) --arg home "$HOME" \
-        --argjson cap $cap --argjson think $think
+    # Whether anything fell outside the record window, asked from the END of the file so it
+    # costs nothing: request one more record than we render and see if it comes back.
+    set -l more 0
+    test (tail -n (math $lines + 1) "$path" | wc -l | string trim) -gt $lines; and set more 1
+
+    set -l jqargs --arg injected_re (_claude_injected_re) --argjson cap $cap --argjson think $think --argjson more $more
 
     if test -n "$query"
         set -l terms (string escape --style=regex (string split -n ' ' -- $query))
         set -l pat (string join '|' $terms)
-        _claude_session_records "$path" $lines | jq -rs $jqargs "$prog" 2>/dev/null | grep -iE --color=always -- "$pat|\$"
+        _claude_records_jq "$path" $lines $jqargs "$prog" \
+            | grep -iE --color=always -- "$pat|\$"
     else
-        _claude_session_records "$path" $lines | jq -rs $jqargs "$prog" 2>/dev/null
+        _claude_records_jq "$path" $lines $jqargs "$prog"
     end
 end

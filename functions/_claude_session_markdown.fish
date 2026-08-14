@@ -5,10 +5,9 @@
 # *typography* (wrapping at the right width, tables, nested lists, syntax-highlighted
 # code). Roles are `##` headings because mdcat draws those as a coloured rule + name.
 #
-# It duplicates the record-extraction jq in _claude_session_preview. That is a real cost,
-# accepted deliberately: unifying them would mean rewriting the working ANSI fallback to
-# consume markdown instead of records, and the fallback is what keeps the plugin working
-# with no dependency at all.
+# It emits the TURNS only. The header is built by _claude_session_head instead, because fzf
+# can pin the first N preview lines with `--preview-window ~N` and N must be constant — left to
+# mdcat the header ran six to eight lines depending on how long a branch name was.
 function _claude_session_markdown --description "Emit a Claude session transcript as plain markdown"
     argparse f/full -- $argv 2>/dev/null; or return 1
     set -l path $argv[1]
@@ -30,41 +29,44 @@ function _claude_session_markdown --description "Emit a Claude session transcrip
         return
     end
 
-    # How a turn is marked. This is the real styling lever: mdcat is not themeable per
-    # element, but it draws each markdown construct differently, so choosing the construct
-    # chooses the look. An unrecognised value falls through to `heading`.
-    #   heading  ## user   -> ━━ user            (default)
-    #   rule     --- + ##   -> ══════ full-width rule, then ━━ user
-    #   quiet    ### user  -> ── user             (lighter)
-    #   quote    > quote    -> │ gutter that survives wrapping, but italic throughout
-    set -l turns heading
-    if set -q claude_fish_turns; and test -n "$claude_fish_turns"
-        set turns $claude_fish_turns
-    end
-
-    set -l id (string replace -r '\.jsonl$' '' -- (path basename "$path"))
-    set -l mtime (stat -f '%m' "$path" 2>/dev/null)
-    test -n "$mtime"; or set mtime (stat -c '%Y' "$path" 2>/dev/null)
-    set -l size (du -h "$path" 2>/dev/null | cut -f1 | string trim)
-    set -l facts
-    test -n "$size"; and set -a facts "$size"
-    test -n "$mtime"; and set -a facts (string trim -- (_claude_reltime $mtime))
-    for l in (_claude_live_sessions)
-        set -l lp (string split \t -- $l)
-        test "$lp[1]" = "$id"; and set -a facts "open now ($lp[2])"
-    end
-    set -a facts (string sub -l 8 -- $id)
+    # Roles are always `##` headings. The preview then either frames them (the default) or
+    # leaves mdcat's own `━━ user` rendering alone — those are the only two looks worth
+    # keeping. Earlier versions also offered a full-width rule, a lighter `###` and a
+    # blockquote; all three were exploration leftovers, and once framing could colour the two
+    # roles differently none of them had a reason to exist (the blockquote also italicised
+    # whole turns and its own headings collided with the role marker).
 
     # tool_use / tool_result blocks carry neither .text nor .thinking, so they drop out
     # here — the same noise policy cchb and ccresume adopt. Thinking is held back too,
     # except in read mode.
-    set -l prog '
+    set -l prog (_claude_clip_jq | string collect)'
       def nz: . != null and . != "";
-      def turnblock($role; $text):
-          if   $turns == "rule"  then "\n---\n\n## " + $role + "\n\n" + $text
-          elif $turns == "quiet" then "\n### " + $role + "\n\n" + $text
-          elif $turns == "quote" then "\n> **" + $role + "**\n>\n> " + ($text | gsub("\n"; "\n> "))
-          else "\n## " + $role + "\n\n" + $text end;
+      # Claude Code injects machinery into the transcript as ordinary `user` turns —
+      # task notifications, system reminders, command output — and they are NOT flagged
+      # isMeta, so that field cannot tell them apart from something you typed. They arrive
+      # as XML-ish blocks, and in a preview they are pure noise: a wall of <task-id> and
+      # <output-file> where a question should be. Matched on a short, conservative list of
+      # opening tags rather than "anything starting with <", so a message that genuinely
+      # begins with markup survives.
+      def injected: test($injected_re);
+      def turnblock($role; $text): "\n## " + $role + "\n\n" + $text;
+      # Both clip markers say which END went missing. The cut itself walks whole blocks —
+      # see _claude_clip_jq: a message that stops mid-sentence reads as damage, not a preview.
+      # The last turn keeps its tail because the pane is anchored on the end of the
+      # conversation; measured across six real sessions it was over budget in all six, so
+      # head-clipping it hid precisely the words the pane is opened to read.
+      def clip($tail):
+        if (length <= $cap) then .
+        else . as $t
+          | ($t | split("\n") | length) as $was
+          | clipped($tail; $cap) as $k
+          | ($was - ($k | split("\n") | length)) as $gone
+          | (if $gone > 1 then "*… " + ($gone|tostring) + " more lines*" else "*… more*" end) as $mark
+          # The marker sits where the cut is, so its POSITION says which end went missing and the
+          # text does not have to. A bare … said neither, and the first question it got was
+          # "what are those?".
+          | if $tail then $mark + "\n\n" + $k else $k + "\n\n" + $mark end
+        end;
       def msgtext(m):
         (m.content) as $c
         | ( if   ($c|type) == "string" then $c
@@ -73,34 +75,37 @@ function _claude_session_markdown --description "Emit a Claude session transcrip
                               elif type=="string" then . else "" end ] | join("\n\n"))
             else "" end );
       [ .[] | select(type=="object") ] as $recs
-      | ( [ $recs[] | select(.type=="custom-title") | .customTitle ] | last ) as $custom
-      | ( [ $recs[] | select(.type=="ai-title") | .aiTitle ] | last ) as $ai
-      | ( [ $recs[] | select(.type=="agent-name") | .agentName ] | last ) as $agent
-      | ( [ $recs[] | select(.type=="last-prompt") | .lastPrompt ] | last ) as $last
-      | ( [ $recs[] | select(.type=="user" and ((.isMeta // false) | not)) | msgtext(.message) | select(nz) ] | first ) as $firstuser
-      | ( [ $recs[] | .cwd // empty ] | last ) as $cwd
-      | ( [ $recs[] | .gitBranch // empty | select(nz) ] | last ) as $branch
-      | ( [ $recs[] | select(.type=="assistant") | .message.model // empty | select(nz) ] | last ) as $model
-      | ( if ($custom | nz) then $custom
-          elif ($ai | nz) then $ai
-          elif ($agent | nz) then $agent
-          elif ($firstuser | nz) then ($firstuser | .[0:120])
-          else "(untitled)" end ) as $title
-      | ( [ (($cwd // "") | sub("^" + $home; "~")), $branch, $model ]
-          | map(select(nz)) | map("`" + . + "`") | join(" · ") ) as $where
-      | ( "# " + ($title | gsub("[\n\r]+"; " "))
-          + (if ($where | nz) then "\n\n" + $where else "" end)
-          + "\n\n`" + $facts + "`"
-          + (if ($last | nz)
-             then "\n\n> ↩ " + ($last | .[0:500] | gsub("[ \t\n\r]+"; " ") | .[0:240])
-             else "" end) ),
-        ( $recs[]
-          | select(.type=="user" or .type=="assistant")
-          | msgtext(.message) as $t
-          | select($t | nz)
-          | turnblock((if .type=="user" then "user" else "assistant" end); ($t | .[0:$cap])) )'
+      | ( [ $recs[]
+            | select(.type=="user" or .type=="assistant")
+            | { role: (if .type=="user" then "user" else "assistant" end), t: msgtext(.message) }
+            | select(.t | nz)
+            | select(.t | injected | not) ]
+          # One reply is many records: the assistant emits a fresh record for every text block
+          # between tool calls, and tool results come back as `user` records. On a real session
+          # that is 1047 assistant and 681 user records for 15 actual turns, with runs of up to
+          # 82 consecutive records of the same role. Since the tool calls in between are hidden,
+          # rendering each record as its own turn shows one reply as a dozen frames and makes
+          # the assistant look like it spoke far more often than it did. Merge the runs.
+          | reduce .[] as $m ([];
+              if (length > 0) and (.[-1].role == $m.role)
+              then .[0:-1] + [{ role: $m.role, t: (.[-1].t + "\n\n" + $m.t) }]
+              else . + [$m] end)
+          | . as $turns
+          | ($turns | length) as $n
+          | ( if $more == 1
+              then "*… earlier turns are outside the preview window — ctrl-o reads further back*\n"
+              else empty end ),
+            ( range(0; $n)
+              | . as $i
+              | turnblock($turns[$i].role; ($turns[$i].t | clip($i == $n - 1))) ) )'
 
-    _claude_session_records "$path" $lines \
-        | jq -rs --arg facts (string join ' · ' $facts) --arg home "$HOME" \
-        --arg turns "$turns" --argjson cap $cap --argjson think $think "$prog" 2>/dev/null
+    # Whether anything fell outside the record window, without reading the file: ask for one
+    # more record than we render and see if it comes back. tail reads from the end, so this
+    # costs nothing even on an 84MB transcript.
+    set -l more 0
+    test (tail -n (math $lines + 1) "$path" | wc -l | string trim) -gt $lines; and set more 1
+
+    _claude_records_jq "$path" $lines \
+        --arg injected_re (_claude_injected_re) --argjson cap $cap --argjson think $think \
+        --argjson more $more "$prog"
 end

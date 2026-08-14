@@ -1,3 +1,5 @@
+complete -c ccri -s r -l repo -d 'Look in this repository and its worktrees'
 complete -c ccri -s a -l all -d 'Search across all projects, not just this folder'
 complete -c ccri -s t -l trash -d 'Browse trashed sessions; enter restores'
+complete -c ccri -s w -l worktrees -d 'Pick a git worktree, then a session inside it'
 complete -c ccri -s h -l help -d 'Show usage'
