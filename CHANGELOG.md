@@ -6,7 +6,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-08-21
+## [0.3.0] - 2026-08-25
 
 The picker gains a write side, a preview worth reading, and an answer for git worktrees.
 `CLAUDE.md` carries the measurements behind each of these.
