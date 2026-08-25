@@ -6,6 +6,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-25
+
 ### Fixed
 
 - **Backing out of the picker no longer reports an error.** `fzf` exits 130 on esc/ctrl-c and 1 on
