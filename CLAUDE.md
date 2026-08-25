@@ -18,6 +18,12 @@ project instead of just the current folder. `ccr --empty-trash` purges the trash
 
 ## Layout
 
+- **`stat` is probed GNU-first, and the order is load-bearing.** `stat -f` on GNU means
+  "filesystem status": given a file it prints a multi-line block about the *filesystem* to stdout
+  and only then exits non-zero, so trying BSD first poisoned every row on Linux while
+  `2>/dev/null` hid the complaint. The mtime field became `Inodes: Total: … / Type: overlayfs`,
+  and since it was multi-line each line became another row in the picker. That is why CI had been
+  red since June. The value is now also required to be digits, whichever stat answered.
 - `functions/_claude_sessions.fish` — parses `~/.claude/projects/**/*.jsonl` via `jq` into
   `id<TAB>title<TAB>cwd<TAB>path<TAB>mtime<TAB>branch<TAB>body` (most-recent first). Override the
   root with `$CLAUDE_FISH_PROJECTS_ROOT` (used by the tests). Drops sidechains and empty shells.
@@ -237,11 +243,14 @@ render without paying 4× on every cursor move. The shapes are in git if one is 
 Not by reading changelogs for which builtin arrived when — that is how the README ended up
 claiming fish 3.4, then 3.5, both wrong. Each floor was run:
 
-- **fish 4.0+**: `docker run -i --rm -v "$PWD":/src:ro ubuntu:22.04 bash -s` with a script that
-  installs fish from the distro (3.3.1 → 37 failures) or from `ppa:fish-shell/release-3`
-  (3.7.1 → 7 failures, and they are real: a roomy record splits into six elements, a header line
-  overruns). `fish-actions/install-fish` takes no version input and uses the release-4 PPA, so CI
-  covers 4.x only.
+- **fish 3.7+**: `docker run -i --rm -v "$PWD":/src:ro ubuntu:22.04 bash -s` with a script that
+  installs fish from the distro (3.3.1 → 35 failures) or from `ppa:fish-shell/release-3`
+  (3.7.1 → green). `fish-actions/install-fish` takes no version input; on ubuntu-24.04 its
+  release-4 PPA gives 4.8.1, so CI runs 4.x and the container covers the floor.
+  The first version of this note claimed 4.0+ on the strength of 7 failures at 3.7.1. Six of those
+  were the `stat` bug below — measured on Linux and blamed on the fish version — and the seventh
+  was the header-width test stripping only `m`-terminated escapes while `set_color normal` also
+  emits `ESC ( B`. Both are fixed; 3.7.1 is green.
 - **fzf 0.63+**: `mise x fzf@<version> -- fzf <the ccri flag set> --filter=t` walks the versions —
   0.55 rejects `--accept-nth`, 0.60 and 0.62 reject `--footer` — and then the pty probe runs the
   real picker at 0.63.0 to check it behaves, not merely parses.

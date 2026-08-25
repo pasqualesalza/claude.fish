@@ -173,7 +173,11 @@ set -l hd (_claude_session_head "$sand/.claude/projects/dummy/$id1.jsonl" 60)
 set -l esc1 (printf '\033')
 set -g __hdover 0
 for l in $hd
-    set -l p (string replace -ra $esc1'\[[0-9;?]*m' '' -- $l)
+    # Strip EVERY escape sequence, not just the ones ending in `m`: `set_color normal` also emits
+    # a charset selector (ESC ( B) on some terminfo, which survived a narrower pattern and counted
+    # as three columns — the assertion then failed on fish 3.7 in a container for a header that was
+    # the right width all along.
+    set -l p (string replace -ra $esc1'\([A-Z]' '' -- (string replace -ra $esc1'\[[0-9;?]*[a-zA-Z]' '' -- $l))
     test (string length -- "$p") -gt 60; and set __hdover (math $__hdover + 1)
 end
 @test "no header line exceeds the width" $__hdover -eq 0

@@ -59,6 +59,11 @@ The picker gains a write side, a preview worth reading, and an answer for git wo
   worktree the folder held no transcript at all. Both commands now widen to the repository when the
   current folder has nothing filed under it, and say so.
 - `ccr <query>` falling through to the picker now keeps the scope it was given.
+- **The session list was broken on Linux.** `stat` was probed BSD-first, and on GNU `stat -f`
+  prints a multi-line block about the *filesystem* to stdout before failing — so the mtime field
+  filled up with `Inodes:` and `Type: overlayfs`, and every line of it became another row in the
+  picker. Probed GNU-first now, with the value required to be digits. This is also why CI had been
+  red since June.
 
 ## [0.2.2] - 2026-07-06
 

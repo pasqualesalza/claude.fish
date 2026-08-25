@@ -50,10 +50,15 @@ function _claude_sessions --description "Emit Claude Code sessions as TSV: id<TA
         set limit $CLAUDE_FISH_LIMIT
     end
     set -l recent
-    if stat -f '%m' $files[1] >/dev/null 2>&1
-        set recent (stat -f '%m %N' $files)
-    else
+    # GNU first, BSD second, and the order is load-bearing: `stat -f` on GNU means "filesystem
+    # status", so it prints a multi-line block ABOUT the file to stdout and only then exits
+    # non-zero. Trying BSD first therefore poisons the output on Linux even though the call
+    # "failed" — the `2>/dev/null` hides the complaint, not the block. BSD's `stat -c` is simply an
+    # illegal option: nothing on stdout, so probing in this order is safe on both.
+    if stat -c '%Y' $files[1] >/dev/null 2>&1
         set recent (stat -c '%Y %n' $files)
+    else
+        set recent (stat -f '%m %N' $files)
     end
     set -l top (printf '%s\n' $recent | sort -rn | head -n $limit | string replace -r '^[0-9]+ ' '')
     test (count $top) -gt 0; or return 0
@@ -147,7 +152,11 @@ function _claude_sessions --description "Emit Claude Code sessions as TSV: id<TA
           if [ "$long" = 1 ]; then meta=$(parse 2); else meta=$(parse 1); fi
         fi
         [ -n "$meta" ] || exit 0
-        mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)
+        # GNU first (see above), and then insist on digits: whichever stat ran, anything that is
+        # not a plain number is junk, and junk here becomes extra rows in the picker — a multi-line
+        # value made every line of it one.
+        mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
+        case "$mtime" in ""|*[!0-9]*) mtime=0 ;; esac
         id="${f##*/}"; id="${id%.jsonl}"
         t=$(printf "%s" "$meta" | cut -f1)
         c=$(printf "%s" "$meta" | cut -f2)

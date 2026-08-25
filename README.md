@@ -164,9 +164,9 @@ fish tools/render-gallery.fish          # or: … turns   /   … themes
 
 Every floor below is measured, not inferred:
 
-- **fish 4.0+** — what CI installs and what this is developed against. fish 3 is *not* supported:
-  in an ubuntu container the suite fails 7 assertions on 3.7.1 and 37 on 3.3.1 (a roomy list record
-  comes back as six elements instead of one, and a header line overruns its width).
+- **fish 3.7+** — the suite is green on 3.7.1 and on 4.8.1, run in an ubuntu container; 3.3.1 fails
+  35 assertions. (3.5 is where the `path` builtin this relies on landed, but the PPA only offers
+  the newest 3.x, so 3.7 is the oldest actually tested.)
 - **[`fzf`](https://github.com/junegunn/fzf) 0.63+** — 0.62 and below have no `--footer`, and 0.55
   no `--accept-nth`. Verified at 0.63.0 by running the picker, not just by accepting the flags:
   frames drawn, footer rendered, rows re-fitted on resize.
