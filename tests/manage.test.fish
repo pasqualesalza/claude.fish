@@ -466,6 +466,25 @@ functions -e __ccf_sess
 set -gx CLAUDE_FISH_PROJECTS_ROOT $saved_root3
 rm -rf "$wroot"
 
+# --- backing out of the picker is not a failure ------------------------------
+# fzf exits 130 on esc/ctrl-c and 1 on no match. Propagating those verbatim painted an error in
+# the prompt every time you opened the picker and changed your mind. Anything else still is a
+# failure: 2 is an fzf error, 127 a missing fzf. The picker is stubbed by defining `fzf`, which is
+# what ccri calls when fzf.fish's wrapper is absent.
+source "$here"/../functions/ccri.fish
+for __code in 130 1 2 127
+    function fzf --inherit-variable __code
+        return $__code
+    end
+    ccri --all >/dev/null 2>&1
+    set -g __ccri_rc_$__code $status
+end
+functions -e fzf
+@test "esc leaves no error behind" $__ccri_rc_130 -eq 0
+@test "nor does an empty match" $__ccri_rc_1 -eq 0
+@test "an fzf error still propagates" $__ccri_rc_2 -eq 2
+@test "and so does a missing fzf" $__ccri_rc_127 -eq 127
+
 @test "delete resolves in a child shell" (fish -c "$pre"'functions -q _claude_session_delete'; and echo yes; or echo no) = yes
 
 # --- fenced code blocks survive clipping ------------------------------------

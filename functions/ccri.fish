@@ -87,8 +87,16 @@ function ccri --description "Interactively pick and resume a Claude Code session
             --preview-window 'right:55%,wrap' \
             --bind "resize:reload($pre"'_claude_worktrees_table --width auto)' \
             --footer 'enter open · esc quit')
-        or return
-        test -n "$scope"; or return 1
+        # Backing out of a picker is not a failure. fzf exits 130 on esc/ctrl-c and 1 on no
+        # match, and propagating those verbatim painted an error in the prompt every time you
+        # looked and changed your mind. Anything else — 2 for an fzf error, 127 for a missing
+        # fzf — is a failure and still propagates.
+        set -l rc $status
+        if test $rc -ne 0
+            contains -- $rc 1 130; and return 0
+            return $rc
+        end
+        test -n "$scope"; or return 0
     end
 
     set -l build _claude_sessions_table --width $listw
@@ -251,9 +259,17 @@ function ccri --description "Interactively pick and resume a Claude Code session
         --bind 'shift-up:preview-up,shift-down:preview-down' \
         --bind 'alt-up:preview-page-up,alt-down:preview-page-down' \
         --footer "$footer")
-    or return
+    # Backing out of a picker is not a failure. fzf exits 130 on esc/ctrl-c and 1 on no
+    # match, and propagating those verbatim painted an error in the prompt every time you
+    # looked and changed your mind. Anything else — 2 for an fzf error, 127 for a missing
+    # fzf — is a failure and still propagates.
+    set -l rc $status
+    if test $rc -ne 0
+        contains -- $rc 1 130; and return 0
+        return $rc
+    end
 
-    test -n "$selected"; or return
+    test -n "$selected"; or return 0
     set -l s (string split \t -- $selected)
     set -l id $s[1]
     set -l spath $s[2]

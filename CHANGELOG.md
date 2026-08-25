@@ -6,6 +6,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Backing out of the picker no longer reports an error.** `fzf` exits 130 on esc/ctrl-c and 1 on
+  no match, and `ccri` propagated those verbatim, so the prompt showed a failure every time you
+  opened the picker and changed your mind. A real failure — 2 from fzf, 127 for a missing fzf —
+  still propagates.
+
 ## [0.3.0] - 2026-08-25
 
 The picker gains a write side, a preview worth reading, and an answer for git worktrees.
