@@ -1,5 +1,6 @@
-# The jq definitions that cut a message down to a budget, shared by both renderers so the
-# mdcat path and the no-dependency fallback can never disagree about what you are looking at.
+# The jq definitions both preview renderers share, so the mdcat path and the no-dependency
+# fallback can never disagree about what you are looking at: how a message is cut down to a
+# budget, and when a turn happened.
 #
 # Cutting at an exact character count lands mid-sentence, mid-list and mid-code — a message
 # stops on "e la riga di sot" and reads as damage rather than as a preview. So the cut walks
@@ -17,7 +18,7 @@
 # dropping the END needs a closing one. Without it, one unbalanced fence makes a markdown
 # renderer read every LATER turn as code too — markdown has no turn boundaries — and the rest
 # of the pane arrives as literal ** and ## headings.
-function _claude_clip_jq --description "jq definitions for clipping a message at block boundaries"
+function _claude_clip_jq --description "jq definitions shared by both preview renderers"
     echo '
       def _blocks:
         split("\n")
@@ -56,5 +57,28 @@ function _claude_clip_jq --description "jq definitions for clipping a message at
           elif $tail then "```\n" + $t
           else $t + "\n```" end;
       def clipped($tail; $b): _cutblocks($tail; $b) | balance($tail);
+      # When a turn happened. Just the clock inside one day; the date as well on the first turn of
+      # a new one, which is the convention every chat client settled on — a bare 14:05 on a
+      # three-week-old session says nothing. Two SPACES separate it from the role, never a middle
+      # dot: the frame pass is awk, the awk on CI is mawk, and mawk counts bytes, so a multi-byte
+      # separator would have to be measured in bytes there.
+      # (No apostrophes in this comment on purpose: the whole program is a single-quoted fish
+      # string, and one apostrophe ends it — which is exactly how this edit failed the first time.)
+      #
+      # Local time via strflocaltime. On jq 1.6 that is an hour off during DST (measured: 11:00 for
+      # an 08:00Z August instant, against 10:00 on 1.7 and later) — the times are right from 1.7.
+      # [.] rather than an escaped dot: a backslash has to survive BOTH fish single quotes and jq
+      # string parsing, and what reaches jq is then an invalid JSON escape. Same trick as the
+      # [*][*] in the fallback renderer.
+      def epoch: if . == null or . == "" then null else (sub("[.][0-9]+Z$"; "Z") | fromdateiso8601) end;
+      def when($prev):
+        (.ts | epoch) as $e
+        | if $e == null then ""
+          else ($e | strflocaltime("%Y-%m-%d")) as $day
+            | ($prev | epoch) as $pe
+            | (if $pe == null then true else (($pe | strflocaltime("%Y-%m-%d")) != $day) end) as $newday
+            | if $newday then ($e | strflocaltime("%d %b %H:%M")) else ($e | strflocaltime("%H:%M")) end
+          end;
+
 '
 end

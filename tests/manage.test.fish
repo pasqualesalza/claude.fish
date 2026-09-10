@@ -466,6 +466,46 @@ functions -e __ccf_sess
 set -gx CLAUDE_FISH_PROJECTS_ROOT $saved_root3
 rm -rf "$wroot"
 
+# --- when a turn happened -----------------------------------------------------
+# A bare clock says nothing on a three-week-old session, so the date rides along on the first
+# turn of each new day — the convention every chat client settled on — and the clock alone
+# inside a day.
+set -l tdir (mktemp -d)
+printf '%s\n' \
+    '{"type":"user","cwd":"/tmp/p","timestamp":"2026-08-11T08:00:00.100Z","message":{"content":"primo"}}' \
+    '{"type":"assistant","timestamp":"2026-08-11T08:05:00.200Z","message":{"content":[{"type":"text","text":"stesso giorno"}]}}' \
+    '{"type":"user","cwd":"/tmp/p","timestamp":"2026-09-10T07:30:00.300Z","message":{"content":"giorno nuovo"}}' >"$tdir/t.jsonl"
+set -l tmd (_claude_session_markdown "$tdir/t.jsonl")
+set -l heads
+for l in $tmd
+    string match -qr '^## (user|assistant)' -- $l; and set -a heads $l
+end
+@test "every turn carries a time" (string match -ar '[0-9][0-9]:[0-9][0-9]' -- $heads | count) -eq 3
+# The first turn of the window and the first of a new day carry the date; the middle one does not.
+@test "the first turn carries the date" (string match -qr '^## user  [0-9]+ [A-Za-z]+ [0-9][0-9]:' -- $heads[1]; and echo yes; or echo no) = yes
+@test "a turn on the same day carries only the clock" (string match -qr '^## assistant  [0-9][0-9]:[0-9][0-9]$' -- $heads[2]; and echo yes; or echo no) = yes
+@test "a new day brings the date back" (string match -qr '^## user  [0-9]+ [A-Za-z]+ [0-9][0-9]:' -- $heads[3]; and echo yes; or echo no) = yes
+# Local time, and parsed as UTC: 08:00Z is not 08:00 anywhere east or west of Greenwich.
+@test "the timestamp is parsed as UTC" (_claude_epoch 2026-08-11T08:00:00.100Z) -eq 1786435200
+@test "junk gets no epoch" (_claude_epoch nonsense >/dev/null 2>&1; echo $status) -ne 0
+
+# The stamp takes its columns out of the rule, which must still land exactly on the pane width.
+# `length()` cannot measure the closing ━ for this: it is three bytes, and awk counts bytes in
+# mawk and characters in gawk, so the two disagree by two columns.
+set -l stamped (printf '━━ user  25 Aug 15:07\n\nciao\n' | awk -v w=48 -v ucol=1\;32 -v acol=1\;36 (_claude_frame_awk | string collect))
+set -l stamped_plain (string replace -ra (printf '\033')'\[[0-9;?]*[a-zA-Z]' '' -- $stamped)
+@test "a stamped frame rule is exactly the pane width" (string length -- "$stamped_plain[1]") -eq 48
+@test "and the stamp sits at its right edge" (string match -qr '25 Aug 15:07 ━$' -- "$stamped_plain[1]"; and echo yes; or echo no) = yes
+rm -rf "$tdir"
+
+# --- the age column keeps the counter and gains a date -----------------------
+# `13d` says roughly how long ago, `24 Jul` says which day, and past a week only the pair
+# answers both. Below a week the date adds nothing and is not paid for.
+set -l tnow (date +%s)
+@test "a recent age is the counter alone" (string trim -- (_claude_reltime --date (math $tnow - 3600) $tnow)) = 1h
+@test "past a week the date joins it" (string match -qr '^[0-9]+d [0-9]+ [A-Za-z]+$' -- (string trim -- (_claude_reltime --date (math $tnow - 1209600) $tnow)); and echo yes; or echo no) = yes
+@test "and without the flag nothing changes" (string trim -- (_claude_reltime (math $tnow - 1209600) $tnow)) = 14d
+
 # --- backing out of the picker is not a failure ------------------------------
 # fzf exits 130 on esc/ctrl-c and 1 on no match. Propagating those verbatim painted an error in
 # the prompt every time you opened the picker and changed your mind. Anything else still is a

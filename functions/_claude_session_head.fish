@@ -101,7 +101,43 @@ function _claude_session_head --description "Emit the preview's fixed three-line
     set -l dim (set_color -d)
     set -l rst (set_color normal)
 
-    echo "$bold"(_claude_fit "$title" $width)"$rst"
+    # The title line is nearly empty — 16 of 88 on a real session — so the session's span goes
+    # there, right-aligned: for anything older than today the clock alone says nothing, and this
+    # is the line you read before deciding to resume. The start comes from the FIRST record
+    # (`head -n 1`, one line read) and the end from the mtime we already have; when both fall on
+    # the same day the date is not repeated. Dropped entirely if the title would have to give up
+    # room for it.
+    set -l span
+    if test -n "$mtime"
+        # The FIRST record carries no timestamp — a transcript opens with metadata — so take the
+        # first one that has any. `grep -m1` stops at that line instead of reading the file.
+        set -l first (string replace -r '.*"timestamp":"' '' -- (grep -m1 -ao '"timestamp":"[^"]*"' "$path" 2>/dev/null) | string replace '"' '')
+        if test -n "$first"
+            set -l fe (_claude_epoch "$first")
+            if string match -qr '^[0-9]+$' -- "$fe"
+                set -l d1 (date -r $fe '+%d %b' 2>/dev/null; or date -d "@$fe" '+%d %b' 2>/dev/null)
+                set -l t1 (date -r $fe '+%H:%M' 2>/dev/null; or date -d "@$fe" '+%H:%M' 2>/dev/null)
+                set -l d2 (date -r $mtime '+%d %b' 2>/dev/null; or date -d "@$mtime" '+%d %b' 2>/dev/null)
+                set -l t2 (date -r $mtime '+%H:%M' 2>/dev/null; or date -d "@$mtime" '+%H:%M' 2>/dev/null)
+                if test "$d1" = "$d2"
+                    set span "$d1 $t1 → $t2"
+                else
+                    set span "$d1 $t1 → $d2 $t2"
+                end
+            end
+        end
+    end
+
+    set -l titleline (_claude_fit "$title" $width)
+    if test -n "$span"
+        set -l room (math $width - (string length -- $span) - 2)
+        if test $room -ge 12
+            set -l t (_claude_fit "$title" $room)
+            set -l gap (string repeat -n (math $width - (string length -- $t) - (string length -- $span)) ' ')
+            set titleline "$bold$t$rst$gap$dim$span"
+        end
+    end
+    echo "$titleline$rst"
     echo "$dim"(_claude_fit (string join ' · ' $facts) $width)"$rst"
     echo "$dim"(string repeat -n $width ─)"$rst"
 end

@@ -77,7 +77,8 @@ function _claude_session_markdown --description "Emit a Claude session transcrip
       [ .[] | select(type=="object") ] as $recs
       | ( [ $recs[]
             | select(.type=="user" or .type=="assistant")
-            | { role: (if .type=="user" then "user" else "assistant" end), t: msgtext(.message) }
+            | { role: (if .type=="user" then "user" else "assistant" end), t: msgtext(.message),
+                ts: (.timestamp // "") }
             | select(.t | nz)
             | select(.t | injected | not) ]
           # One reply is many records: the assistant emits a fresh record for every text block
@@ -88,7 +89,9 @@ function _claude_session_markdown --description "Emit a Claude session transcrip
           # the assistant look like it spoke far more often than it did. Merge the runs.
           | reduce .[] as $m ([];
               if (length > 0) and (.[-1].role == $m.role)
-              then .[0:-1] + [{ role: $m.role, t: (.[-1].t + "\n\n" + $m.t) }]
+              # The run keeps the FIRST timestamp: a reply that took ten minutes of tool calls is
+              # one turn, and it started when the assistant began, not when it finished.
+              then .[0:-1] + [{ role: $m.role, t: (.[-1].t + "\n\n" + $m.t), ts: .[-1].ts }]
               else . + [$m] end)
           | . as $turns
           | ($turns | length) as $n
@@ -97,7 +100,9 @@ function _claude_session_markdown --description "Emit a Claude session transcrip
               else empty end ),
             ( range(0; $n)
               | . as $i
-              | turnblock($turns[$i].role; ($turns[$i].t | clip($i == $n - 1))) ) )'
+              | ($turns[$i] | when(if $i == 0 then null else $turns[$i-1].ts end)) as $w
+              | turnblock($turns[$i].role + (if $w == "" then "" else "  " + $w end);
+                          ($turns[$i].t | clip($i == $n - 1))) ) )'
 
     # Whether anything fell outside the record window, without reading the file: ask for one
     # more record than we render and see if it comes back. tail reads from the end, so this

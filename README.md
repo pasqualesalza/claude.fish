@@ -51,13 +51,19 @@ undo it — and the message clears itself on your next action.
 - **Real titles** — a session's `/rename` (marked `✎`) or Claude's auto-generated title,
   not just the first message, with a short id to tell similar/forked sessions apart.
 - **Age, at a glance** — `12m`, `3h`, `5d` — next to where the session lives and its git
-  branch: `now · claude.fish/picker-manage · main`. Rows are budgeted to the pane width and
-  end with `…` when a title is long, rather than running off the edge.
+  branch: `now · claude.fish/picker-manage · main`. Past a week the calendar date joins the
+  counter (`14d 27 Aug`): one says roughly how long ago, the other says which day. Rows are
+  budgeted to the pane width and end with `…` when a title is long, rather than running off the
+  edge.
 - **Which sessions are open right now** — `●` busy, `○` idle. Claude Code registers every
   running instance in `~/.claude/sessions/<pid>.json`, and that registry is what this reads.
 - **Pins** — `★`, sorted to the top.
 - **A transcript preview** with the working directory, git branch, model and size, then the
   conversation with each turn framed and coloured by role.
+- **When things happened.** Each turn's frame carries the time it started, and the date as well on
+  the first turn of a new day — a bare `14:05` says nothing on a three-week-old session. The
+  header's title line ends with the session's span, `11 Aug 10:48 → 10 Sep 11:02`, and drops the
+  second date when both fall on the same day. All in your local time, wherever you read it.
 
 ### What the preview leaves out
 

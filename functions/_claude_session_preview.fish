@@ -196,7 +196,7 @@ function _claude_session_preview --description "Render a Claude Code session tra
       [ .[] | select(type=="object") ] as $recs
       | [ $recs[]
           | select(.type=="user" or .type=="assistant")
-          | { isuser: (.type == "user"), t: msgtext(.message) }
+          | { isuser: (.type == "user"), t: msgtext(.message), ts: (.timestamp // "") }
           | select(.t | nz)
           | select(.t | injected | not) ] as $turns
       | ($turns | length) as $n
@@ -206,7 +206,11 @@ function _claude_session_preview --description "Render a Claude Code session tra
         ( range(0; $n)
           | . as $i
           | (if $turns[$i].isuser then "32" else "36" end) as $c
-          | "\n" + "\u001b[1;" + $c + "m▸ " + (if $turns[$i].isuser then "user" else "assistant" end) + "\u001b[0m"
+          # Same stamp as the mdcat path, from the same shared defs — the clock inside a day, the
+          # date as well when the day changes.
+          | ($turns[$i] | when(if $i == 0 then null else $turns[$i-1].ts end)) as $w
+          | "\n" + "\u001b[1;" + $c + "m▸ " + (if $turns[$i].isuser then "user" else "assistant" end)
+            + "\u001b[0m" + (if $w == "" then "" else "  \u001b[2m" + $w + "\u001b[0m" end)
             + "\n" + ($turns[$i].t | clip($i == $n - 1) | gutter($c)) )'
 
     # Whether anything fell outside the record window, asked from the END of the file so it

@@ -101,6 +101,23 @@ project instead of just the current folder. `ccr --empty-trash` purges the trash
   child is **killed** by ctrl-c, but runs it when the child catches SIGINT and exits later, which
   is what Claude Code does. So the restore holds in the normal path, and a signal-death degrades
   to the pre-0.3.0 behaviour of staying put. Claude's exit status is carried across the trip.
+- **Turn timestamps.** The markdown heading carries `role  when`, separated by two SPACES and
+  never a middle dot: the frame pass is awk, CI runs **mawk**, and mawk counts bytes — a
+  multi-byte separator would have to be measured in bytes there. The same trap bit the rule
+  width: `length(" " stamp " ━")` is 17 in mawk and 15 in gawk under a UTF-8 locale, because `━`
+  is three bytes, so the stamp's width is computed arithmetically (`length(stamp) + 3`) and the
+  rule lands on the pane width under both. Verified on Linux/mawk as well as macOS.
+  The date rides along only on the first turn of a new day, which is what keeps 21 headings down
+  to 2 carrying a date on a real session.
+- `functions/_claude_epoch.fish` — epoch seconds from a transcript timestamp. It must be PARSED
+  as UTC (the trailing `Z`) and only then formatted locally; parsing as local shifts every stamp
+  by the offset. GNU form first, BSD second, result required to be digits — `date -d` exists on
+  macOS too and sets the kernel daylight-saving value, so the fallback chain cannot be trusted to
+  fail cleanly, exactly as with `stat`. The first record of a transcript carries no timestamp, so
+  the header takes the first one that has any (`grep -m1`, which stops there).
+  Formatting is jq's `strflocaltime` in the renderers: on **jq 1.6 that is an hour off during
+  DST** (11:00 for an 08:00Z August instant, against 10:00 from 1.7). Everything else works on
+  1.6, so the floor stays there and the caveat is written down instead.
 - `functions/_claude_place.fish` — the short where-it-lives label: last two path components
   with `.claude/worktrees` removed, so `claude.fish/picker-manage` instead of a 50-column path
   or a bare `mcp`. `functions/_claude_fit.fish` truncates to a column budget with `…`.

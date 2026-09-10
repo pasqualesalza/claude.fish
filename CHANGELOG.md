@@ -6,6 +6,16 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Times in the preview.** Each turn's frame carries the time it started, with the date as well
+  on the first turn of a new day; the header's title line ends with the session's span
+  (`11 Aug 10:48 → 10 Sep 11:02`), collapsed to one date when it all happened on one. Local time,
+  taken from the `timestamp` every record carries.
+- **The age column keeps its counter and gains a date past a week** (`14d 27 Aug`): the counter
+  says roughly how long ago, the date says which day, and beyond a few days only the pair answers
+  both.
+
 ## [0.3.1] - 2026-08-25
 
 ### Fixed

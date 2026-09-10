@@ -27,17 +27,32 @@ function _claude_frame_awk --description "awk program that frames each turn in t
       BEGIN { inturn = 0; eat = 0; pending = 0; col = "\033[" acol "m" }
       {
         p = plain($0)
-        if (p ~ /^━━ (user|assistant)$/) {
-          role = p; sub(/^━━ /, "", role)
+        if (p ~ /^━━ (user|assistant)($|  )/) {
+          meta = p; sub(/^━━ /, "", meta)
+          # The markdown heading carries "role  when", separated by two SPACES. Two spaces and not
+          # a middle dot because mawk — what CI runs — counts bytes, so a multi-byte separator
+          # would have to be measured in bytes here. The stamp is ASCII, so its length is its
+          # width.
+          role = meta; stamp = ""
+          sep = index(meta, "  ")
+          if (sep > 0) { role = substr(meta, 1, sep - 1); stamp = substr(meta, sep + 2) }
           col = (role == "user") ? "\033[" ucol "m" : "\033[" acol "m"
           bar = ""
           # 5, not 4: the rule is "┏━ " + role + " ━" + bar, which is 5 columns of box
           # drawing and spaces around the name. Getting this wrong by one makes the line
           # one column wider than the pane, so the terminal soft-wraps every single frame
-          # and leaves an orphan ━ on its own row.
-          n = w - length(role) - 5
+          # and leaves an orphan ━ on its own row. The stamp takes its own columns off the bar,
+          # so the rule still lands exactly on the pane width.
+          # The stamp costs its own columns plus a space either side and one ━. Counted with
+          # arithmetic, never with length(tail): ━ is three bytes, and awk measures bytes in mawk
+          # and characters in gawk under a UTF-8 locale — length() would give 17 here on one and
+          # 15 on the other, so the rule came out two columns short and would have differed
+          # between CI and this machine.
+          tail = (stamp == "") ? "" : " " stamp " ━"
+          tailw = (stamp == "") ? 0 : length(stamp) + 3
+          n = w - length(role) - 5 - tailw
           for (i = 0; i < n; i++) bar = bar "━"
-          printf "%s┏━ %s ━%s\033[0m\n", col, role, bar
+          printf "%s┏━ %s ━%s%s\033[0m\n", col, role, bar, tail
           inturn = 1; eat = 1; pending = 0
           next
         }

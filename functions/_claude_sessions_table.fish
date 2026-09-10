@@ -103,7 +103,7 @@ function _claude_sessions_table --description "Emit the fzf picker table: displa
             end
         end
 
-        set -l age (string trim -- (_claude_reltime $mtime $now))
+        set -l age (string trim -- (_claude_reltime --date $mtime $now))
 
         set -l disp
         set -l place (_claude_place "$cwd")
