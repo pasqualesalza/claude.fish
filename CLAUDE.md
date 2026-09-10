@@ -9,9 +9,10 @@ a zoxide-style session picker plus completions for the `claude` CLI (which ships
   project (`--repo`/`-r`: this repository and its worktrees). No query → the session this terminal last resumed (remembered in the shell-global
   `_claude_fish_last_session`), else the most recent here. No match → falls back to the
   picker. In-session `/resume` is Claude's own, in-process, and invisible to the shell.
-- `ccri [--all] [query]` — **interactive** fzf picker with a transcript preview.
-  `ctrl-x` trashes, `ctrl-p` pins, `ctrl-o` reads the full transcript, `ctrl-/` toggles the
-  preview. `ccri --trash` browses trashed sessions (enter restores).
+- `ccri [--all|--repo] [query]` — **interactive** fzf picker with a transcript preview.
+  `ctrl-x` trashes, `ctrl-p` pins, `ctrl-o` reads the full transcript in a pager, `ctrl-/` toggles
+  the preview. `ccri --trash` browses trashed sessions (enter restores); `ccri --worktrees` is an
+  index of the worktrees that have sessions.
 
 Both run `claude --resume <id>` in the session's own working directory. `--all` searches every
 project instead of just the current folder. `ccr --empty-trash` purges the trash for good.
@@ -196,11 +197,9 @@ project instead of just the current folder. `ccr --empty-trash` purges the trash
 - `completions/` — hand-written `claude` flags/subcommands (+ dynamic `--resume`) and `ccr`/`ccri`.
 - `tests/parse.test.fish` (jsonl parsing) and `tests/manage.test.fish` (pins, trash, restore,
   liveness — all against a throwaway copy of `tests/fixtures/`).
-  The floor is **fish 4.0**, and it is measured, not inferred from which builtin arrived when: in
-  an ubuntu container the suite fails 7 assertions on fish 3.7.1 and 37 on 3.3.1. The 3.7 failures
-  are real, not test artifacts — a roomy record comes back as six elements instead of one (the
-  `string collect` fragility above) and a header line overruns its width. `fish-actions/install-fish`
-  takes no version input; on Linux it installs from the release-4 PPA, so CI covers 4.x only.
+  The floor is **fish 3.7** — see Requirements below for how each floor was run. `fish-actions/install-fish`
+  takes no version input; on Linux it installs from the release-4 PPA, so CI covers 4.x and the
+  container covers the floor.
   **CI has no mdcat** — only fish, fishtape and the jq that ships with the runner image — so
   anything asserting on mdcat's output sits behind `if type -q mdcat`, and the frame pass is
   covered twice: once end to end there, once by feeding `_claude_frame_awk` a synthetic `━━ role`

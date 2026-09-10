@@ -6,6 +6,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-10
+
 ### Added
 
 - **Times in the preview.** Each turn's frame carries the time it started, with the date as well
