@@ -6,6 +6,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-19
+
 ### Fixed
 
 - **`claude --resume` completion offers sessions from every project**, not just the current
