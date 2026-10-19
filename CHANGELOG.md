@@ -6,6 +6,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`claude --resume` completion offers sessions from every project**, not just the current
+  folder: `claude --resume <id>` finds a session from anywhere, so the narrower list hid ids that
+  would have worked.
+- **`claude -r` completes session ids too** — it is claude's own short form of `--resume`, and
+  used to fall through to the subcommand list.
+
 ## [0.4.0] - 2026-09-10
 
 ### Added
